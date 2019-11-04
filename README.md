@@ -1,1 +1,1 @@
-# async-floodmax
+# Asynchronous Floodmax Algorithm with Synchronizer
