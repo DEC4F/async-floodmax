@@ -10,11 +10,11 @@ final class Token {
     //////////////////////////////////
 
     enum TokenType {
-        EXPLORE,
-        LEADER_ANOUNCEMENT,
-        REJECT,
+        ANOUNCEMENT,
+        DUMMY,
         COMPLETED,
-        DUMMY
+        EXPLORE,
+        REJECT
     }
 
     //////////////////////////////////
