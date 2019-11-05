@@ -2,7 +2,6 @@ package edu.utdalas.cs6380;
 
 import java.io.*;
 import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This app simulates the behavior of processes in 

@@ -10,8 +10,11 @@ final class Token {
     //////////////////////////////////
 
     enum TokenType {
-        Election,
-        Anouncement
+        EXPLORE,
+        LEADER_ANOUNCEMENT,
+        REJECT,
+        COMPLETED,
+        DUMMY
     }
 
     //////////////////////////////////
@@ -19,15 +22,19 @@ final class Token {
     //////////////////////////////////
 
     private int senderID;
+    private int maxID;
     private TokenType type;
+    private int roundTag;
 
     //////////////////////////////////
     // CONSTRUCTOR
     //////////////////////////////////
 
-    Token(int senderID, TokenType type) {
+    Token(int senderID, int maxID, TokenType type, int roundTag) {
         this.senderID = senderID;
+        this.maxID = maxID;
         this.type = type;
+        this.roundTag = roundTag;
     }
 
     //////////////////////////////////
@@ -38,8 +45,16 @@ final class Token {
         return senderID;
     }
 
+    int getMaxID() {
+        return maxID;
+    }
+
     TokenType getTokenType() {
         return type;
+    }
+
+    int getRoundTag() {
+        return roundTag;
     }
 
 }
