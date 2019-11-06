@@ -25,13 +25,13 @@ class AsyncThread implements Runnable {
     private int maxUID;
     private int round;
     private Status status;
-    private int numNeighbor;
     private int numReply;
     private int msgSent;
     private AsyncThread parent;
-    private Map<AsyncThread, BlockingQueue<Token>> sendChannels; // <neighborIdx, Channel>
+    private Map<AsyncThread, BlockingQueue<Token>> sendChannels; // <neighbor, channel>
     private Map<AsyncThread, BlockingQueue<Token>> recvChannels;
-    private Map<AsyncThread, Token> recvMsg; // <neighborIdx, Token>
+    private Map<AsyncThread, Token> recvMsg; // <neighbor, token>
+    private Map<AsyncThread, Boolean> hasTalkedTo; // <neighbor, hasTalked>
 
     //////////////////////////////////
     // CONSTRUCTOR
@@ -45,6 +45,7 @@ class AsyncThread implements Runnable {
         msgSent = 1;
         sendChannels = new HashMap<>();
         recvChannels = new HashMap<>();
+        hasTalkedTo = new HashMap<>();
     }
 
     //////////////////////////////////
@@ -54,12 +55,16 @@ class AsyncThread implements Runnable {
     @Override
     public void run() {
         try {
-        while (status.equals(Status.UNKNOWN)) {
-            if (round == 1)
-                flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
-            recv();
-            round ++;
-        }
+            // init
+            flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
+            while (status.equals(Status.UNKNOWN)) {
+                // reset talkedTo for this "round"
+                for (AsyncThread neighbor : sendChannels.keySet()) {
+                    hasTalkedTo.put(neighbor, false);
+                }
+                recv();
+                round ++;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -69,7 +74,6 @@ class AsyncThread implements Runnable {
         sendChannels.put(neighbor, sendChan);
         recvChannels.put(neighbor, recvChan);
         numReply ++;
-        numNeighbor ++;
     }
     
     //////////////////////////////////
@@ -100,6 +104,7 @@ class AsyncThread implements Runnable {
         recvExplore();
         recvReject();
         recvCompleted();
+        sendDummy();
     }
 
     /**
@@ -184,8 +189,15 @@ class AsyncThread implements Runnable {
             send(new Token(UID, maxUID, TokenType.COMPLETED, round), parent);
     }
 
-    private void sendDummy() {
-        
+    /**
+     * 
+     * @throws InterruptedException
+     */
+    private void sendDummy() throws InterruptedException {
+        for (AsyncThread neighbor : hasTalkedTo.keySet()) {
+            if (!hasTalkedTo.get(neighbor))
+                send(new Token(UID, maxUID, TokenType.DUMMY, round), neighbor);
+        }
     }
 
     /**
@@ -198,6 +210,7 @@ class AsyncThread implements Runnable {
             if (!neighbor.equals(parent)) {
                 Thread.sleep(delay());
                 sendChannels.get(neighbor).put(token);
+                hasTalkedTo.put(neighbor, true);
                 msgSent ++;
             }
         }
@@ -211,6 +224,7 @@ class AsyncThread implements Runnable {
     private void send(Token token, AsyncThread neighbor) throws InterruptedException {
         Thread.sleep(delay());
         sendChannels.get(neighbor).put(token);
+        hasTalkedTo.put(neighbor, true);
         if (!token.getTokenType().equals(TokenType.DUMMY))
             msgSent ++;
     }
