@@ -142,18 +142,14 @@ class AsyncThread implements Runnable {
      */
     private void recvExplore(Token token) throws InterruptedException, ThreadException {
         // flood explore token
-        if (token.getMaxID() > UID) {
+        if (token.getMaxID() > maxUID) {
             maxUID = token.getMaxID();
             parentUID = token.getSenderID();
             flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
         }
         // reply(NACK)
-        else if (token.getMaxID() < UID) {
-            sendReject(token.getSenderID());
-        }
-        // impossible to receive own UID from neighbor
         else
-            throw new ThreadException(ErrorCode.RECEIVING_OWN_UID_FROM_NEIGHBOR);
+            sendReject(token.getSenderID());
     }
 
     /**
