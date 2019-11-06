@@ -42,6 +42,8 @@ class MasterThread implements Runnable {
             spawnThreads();
             // run n thread till leader is elected
             runThreads();
+            // wait for info computed by async threads
+            waitForInfo();
             // print required information
             printInfo();
         } catch (Exception e) {
@@ -64,11 +66,9 @@ class MasterThread implements Runnable {
         threads = new AsyncThread[n];
 
         // init individual SyncThread with their own id, receving channel, sending channel and leader id
-        for (int i = 0; i < ids.length; ++i) {
-            AsyncThread newThread = new AsyncThread(ids[i]);
-            threads[i] = newThread;
+        for (int i = 0; i < n; ++i) {
+            threads[i] = new AsyncThread(ids[i]);
         }
-
         // set up channels between processes
         setUpTokenChannels(n, capacity);
     }
@@ -79,7 +79,7 @@ class MasterThread implements Runnable {
      */
     private void runThreads() throws InterruptedException {
         for (AsyncThread thread : threads) {
-            thread.run();
+            new Thread(thread).start();
         }
     }
 
@@ -105,12 +105,25 @@ class MasterThread implements Runnable {
     }
 
     /**
+     * 
+     * @throws ThreadException
+     */
+    private void waitForInfo() {
+        while (true) {
+            boolean done = true;
+            for (AsyncThread thread : threads) {
+                done = done && thread.getFinished();
+            }
+            if (done)
+                break;
+        }
+    }
+
+    /**
      * print leader ID
      * @throws ThreadException if leader id is still default
      */
     private void printInfo() throws ThreadException {
-        if (leaderID == -1)
-            throw new ThreadException(ErrorCode.LEADER_NOT_FOUND);
         // calc total msg sent
         int totalMsg = 0;
         for (AsyncThread t : threads) {

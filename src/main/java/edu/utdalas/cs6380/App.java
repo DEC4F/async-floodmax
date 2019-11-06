@@ -71,16 +71,6 @@ public final class App {
         br.close();
     }
 
-    private static void printAdjacencyMatrix() {
-        for (int i = 0; i < n; ++i) {
-            StringBuilder row = new StringBuilder();
-            for (int j = 0; j < n; ++j) {
-                row.append(Integer.toString(adj[i][j]));
-            }
-            System.out.println(row.toString());
-        }
-    }
-
     //////////////////////////////////
     // VALIDATION
     //////////////////////////////////

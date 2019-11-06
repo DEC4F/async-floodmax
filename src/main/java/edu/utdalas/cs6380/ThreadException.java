@@ -8,8 +8,7 @@ class ThreadException extends Exception {
     private static final long serialVersionUID = -4974836832746069995L;
 
     public enum ErrorCode {
-        UNEXPECTED_INDEX,
-        LEADER_NOT_FOUND,
+        UNEXPECTED_INDEX
     }
 
     ErrorCode errorCode;

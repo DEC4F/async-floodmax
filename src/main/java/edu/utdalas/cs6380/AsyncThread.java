@@ -25,9 +25,10 @@ class AsyncThread implements Runnable {
     private int maxUID;
     private int round;
     private Status status;
-    private int numReply;
     private int msgSent;
-    private AsyncThread parent;
+    private int numReply = 0;
+    private boolean finished;
+    private AsyncThread parent = this;
     private Map<AsyncThread, BlockingQueue<Token>> sendChannels; // <neighbor, channel>
     private Map<AsyncThread, BlockingQueue<Token>> recvChannels;
     private Map<AsyncThread, Token> recvMsg; // <neighbor, token>
@@ -43,6 +44,7 @@ class AsyncThread implements Runnable {
         status = Status.UNKNOWN;
         round = 1;
         msgSent = 1;
+        finished = false;
         sendChannels = new HashMap<>();
         recvChannels = new HashMap<>();
         hasTalkedTo = new HashMap<>();
@@ -57,7 +59,6 @@ class AsyncThread implements Runnable {
         try {
             // init
             flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
-            System.out.println("Thread!!!" + Integer.toString(UID));
             while (status.equals(Status.UNKNOWN)) {
                 // reset talkedTo for this "round"
                 for (AsyncThread neighbor : sendChannels.keySet()) {
@@ -65,8 +66,8 @@ class AsyncThread implements Runnable {
                 }
                 recv();
                 round ++;
-                System.out.println("Round = " + round);
             }
+            finished = true;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -91,9 +92,7 @@ class AsyncThread implements Runnable {
             BlockingQueue<Token> chann = recvChannels.get(neighbor);
             while (!chann.isEmpty() && chann.peek().getRoundTag() <= round) {
                 recvMsg.put(neighbor, chann.take());
-                System.out.println("Thread " + Integer.toString(UID) + ": i'm stuck here");
             }
-            System.out.println("Thread " + Integer.toString(UID) + ": wait, im not");
         }
         parseRecvToken();
     }
@@ -174,7 +173,7 @@ class AsyncThread implements Runnable {
                 numReply --;
             }
         }
-        if (numReply == 0)
+        if (numReply == 0 && parent != this)
             send(new Token(UID, maxUID, TokenType.COMPLETED, round), parent);
     }
 
@@ -259,6 +258,10 @@ class AsyncThread implements Runnable {
 
     int getMsgSent() {
         return msgSent;
+    }
+
+    boolean getFinished() {
+        return finished;
     }
 
 }
