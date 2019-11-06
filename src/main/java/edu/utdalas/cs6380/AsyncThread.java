@@ -47,7 +47,6 @@ class AsyncThread implements Runnable {
         msgSent = 1;
         sendChannels = new HashMap<>();
         recvChannels = new HashMap<>();
-        recvMsg = new ArrayList<>();
     }
 
     //////////////////////////////////
@@ -82,6 +81,7 @@ class AsyncThread implements Runnable {
      * receive tokens from channels
      */
     private void recv() throws InterruptedException, ThreadException {
+        recvMsg = new ArrayList<>();
         for (Integer neighbor : recvChannels.keySet()) {
             BlockingQueue<Token> chann = recvChannels.get(neighbor);
             while (!chann.isEmpty() && chann.peek().getRoundTag() <= round) {
@@ -97,28 +97,12 @@ class AsyncThread implements Runnable {
      * @throws ThreadException
      */
     private void parseRecvToken () throws InterruptedException, ThreadException {
-        for (Token token : recvMsg) {
-            if (token.getTokenType().equals(TokenType.ANOUNCEMENT) && status.equals(Status.UNKNOWN)) {
-                recvAnouncement(token.getMaxID());
-                return;
-            }
-        }
-        
-        for (Token token : recvMsg) {
-            if (token.getTokenType().equals(TokenType.DUMMY))
-                recvMsg.remove(token);
-        }
-
-        for (Token token : recvMsg) {
-
-        }
-            else if (token.getTokenType().equals(TokenType.COMPLETED)) {
-                recvComplete(token.getSenderID());
-            }
-            else {
-                recvReject(token.getSenderID());
-            }
-        }
+        if (recvAnouncement()) {return;}
+        recvExplore();
+        recvReject();
+        recvCompleted();
+        recvDummy();
+        assert recvMsg.size() == 0;
     }
 
     /**
@@ -126,23 +110,26 @@ class AsyncThread implements Runnable {
      * @param leaderID
      * @throws InterruptedException
      */
-    private void recvAnouncement(Integer leaderID) throws InterruptedException {
-        // validation
-        assert maxUID < leaderID;
-        // flood anouncement token
-        maxUID = leaderID;
-        status = Status.NONLEADER;
-        flood(new Token(UID, maxUID, TokenType.ANOUNCEMENT, round));
-        // print leader info
-        StringBuilder sb = new StringBuilder();
-        sb.append("Thread ").append(UID).append(": LeaderID = ").append(maxUID).append(". Message sent = ").append(msgSent);
-        System.out.println(sb.toString());
+    private Boolean recvAnouncement() throws InterruptedException {
+        for (Token token : recvMsg) {
+            if (token.getTokenType().equals(TokenType.ANOUNCEMENT) && status.equals(Status.UNKNOWN)) {
+                // flood anouncement token
+                maxUID = token.getMaxID();
+                status = Status.NONLEADER;
+                flood(new Token(UID, maxUID, TokenType.ANOUNCEMENT, round));
+                // print leader info
+                StringBuilder sb = new StringBuilder();
+                sb.append("Thread ").append(UID).append(": LeaderID = ").append(maxUID).append(". Message sent = ").append(msgSent);
+                System.out.println(sb.toString());
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * update maxUID, flood neighbors if token has greater
+     * update maxUID, flood neighbors if token has greater maxUID
      * reply reject if token is smaller
-     * @param token
      * @throws InterruptedException
      * @throws ThreadException
      */
@@ -158,35 +145,46 @@ class AsyncThread implements Runnable {
                         numNonParentNeighbors --;
                 }
                 else {
-                    send
+                    send(new Token(UID, maxUID, TokenType.REJECT, round), token.getSenderID());
                 }
-                recvMsg.remove(token);
             }
         }
         if (hasNewInfo) {
             flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
         }
-        // flood explore token
-       
-        // reply(NACK)
-        else
-            sendReject(token.getSenderID());
     }
 
     /**
      * 
-     * @param senderID
      */
-    private void recvComplete(int senderID) {
-
+    private void recvCompleted() {
+        for (Token token : recvMsg) {
+            if (token.getTokenType().equals(TokenType.COMPLETED)) {
+                
+            }
+        }
     }
 
     /**
      * 
-     * @param senderID
      */
-    private void recvReject(int senderID) {
+    private void recvReject() {
+        for (Token token : recvMsg) {
+            if (token.getTokenType().equals(TokenType.REJECT)) {
+                
+            }
+        }
+    }
 
+    /**
+     * 
+     */
+    private void recvDummy() {
+        for (Token token : recvMsg) {
+            if (token.getTokenType().equals(TokenType.DUMMY)) {
+
+            }
+        }
     }
 
     /**
@@ -194,7 +192,7 @@ class AsyncThread implements Runnable {
      * @param token
      * @throws InterruptedException
      */
-    private void flood (Token token) throws InterruptedException {
+    private void flood(Token token) throws InterruptedException {
         for (Integer neighbor: sendChannels.keySet()) {
             if (!neighbor.equals(parentUID)) {
                 Thread.sleep(delay());
@@ -209,7 +207,7 @@ class AsyncThread implements Runnable {
      * @param senderID
      * @throws InterruptedException
      */
-    private void send (Token token, int neighborIdx) throws InterruptedException {
+    private void send(Token token, int neighborIdx) throws InterruptedException {
         Thread.sleep(delay());
         sendChannels.get(neighborIdx).put(token);
         if (!token.getTokenType().equals(TokenType.DUMMY))
