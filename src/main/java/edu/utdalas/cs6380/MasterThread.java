@@ -42,8 +42,8 @@ class MasterThread implements Runnable {
             spawnThreads();
             // run n thread till leader is elected
             runThreads();
-            // print leader information
-            printLeaderInfo();
+            // print required information
+            printInfo();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -107,11 +107,16 @@ class MasterThread implements Runnable {
      * print leader ID
      * @throws ThreadException if leader id is still default
      */
-    private void printLeaderInfo() throws ThreadException {
+    private void printInfo() throws ThreadException {
         if (leaderID == -1)
             throw new ThreadException(ErrorCode.LEADER_NOT_FOUND);
+        // calc total msg sent
+        int totalMsg = 0;
+        for (AsyncThread t : threads) {
+            totalMsg += t.getMsgSent();
+        }
         StringBuilder sb = new StringBuilder();
-        sb.append("Master Thread: Leader is thread ").append(leaderID).toString();
+        sb.append("Master Thread: LeaderID = ").append(leaderID).append(", #Msg sent = ").append(Integer.toString(totalMsg));
         System.out.println(sb.toString());
     }
 
