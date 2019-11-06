@@ -10,7 +10,6 @@ class ThreadException extends Exception {
     public enum ErrorCode {
         UNEXPECTED_INDEX,
         LEADER_NOT_FOUND,
-        RECEIVING_OWN_UID_FROM_NEIGHBOR
     }
 
     ErrorCode errorCode;

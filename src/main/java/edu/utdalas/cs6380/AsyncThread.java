@@ -31,9 +31,9 @@ class AsyncThread implements Runnable {
     private Status status;
     private int numNonParentNeighbors;
     private int msgSent;
-    private Map<Integer, BlockingQueue<Token>> sendChannels;
+    private Map<Integer, BlockingQueue<Token>> sendChannels; // <neighborIdx, Channel>
     private Map<Integer, BlockingQueue<Token>> recvChannels;
-    private List<Token> recvMsg;
+    private Map<Integer, Token> recvMsg; // <neighborIdx, Token>
 
     //////////////////////////////////
     // CONSTRUCTOR
@@ -81,11 +81,11 @@ class AsyncThread implements Runnable {
      * receive tokens from channels
      */
     private void recv() throws InterruptedException, ThreadException {
-        recvMsg = new ArrayList<>();
+        recvMsg = new HashMap<>();
         for (Integer neighbor : recvChannels.keySet()) {
             BlockingQueue<Token> chann = recvChannels.get(neighbor);
             while (!chann.isEmpty() && chann.peek().getRoundTag() <= round) {
-                recvMsg.add(chann.take());
+                recvMsg.put(neighbor, chann.take());
             }
         }
         parseRecvToken();
@@ -102,7 +102,6 @@ class AsyncThread implements Runnable {
         recvReject();
         recvCompleted();
         recvDummy();
-        assert recvMsg.size() == 0;
     }
 
     /**
@@ -111,7 +110,8 @@ class AsyncThread implements Runnable {
      * @throws InterruptedException
      */
     private Boolean recvAnouncement() throws InterruptedException {
-        for (Token token : recvMsg) {
+        for (Integer neighborIdx : recvMsg.keySet()) {
+            Token token = recvMsg.get(neighborIdx);
             if (token.getTokenType().equals(TokenType.ANOUNCEMENT) && status.equals(Status.UNKNOWN)) {
                 // flood anouncement token
                 maxUID = token.getMaxID();
@@ -135,7 +135,8 @@ class AsyncThread implements Runnable {
      */
     private void recvExplore() throws InterruptedException, ThreadException {
         Boolean hasNewInfo = false;
-        for (Token token : recvMsg) {
+        for (Integer neighborIdx : recvMsg.keySet()) {
+            Token token = recvMsg.get(neighborIdx);
             if (token.getTokenType().equals(TokenType.EXPLORE)) {
                 if (token.getMaxID() > maxUID) {
                     hasNewInfo = true;
@@ -145,7 +146,7 @@ class AsyncThread implements Runnable {
                         numNonParentNeighbors --;
                 }
                 else {
-                    send(new Token(UID, maxUID, TokenType.REJECT, round), token.getSenderID());
+                    send(new Token(UID, maxUID, TokenType.REJECT, round), neighborIdx);
                 }
             }
         }
@@ -158,7 +159,8 @@ class AsyncThread implements Runnable {
      * 
      */
     private void recvCompleted() {
-        for (Token token : recvMsg) {
+        for (Integer neighborIdx : recvMsg.keySet()) {
+            Token token = recvMsg.get(neighborIdx);
             if (token.getTokenType().equals(TokenType.COMPLETED)) {
                 
             }
@@ -169,7 +171,8 @@ class AsyncThread implements Runnable {
      * 
      */
     private void recvReject() {
-        for (Token token : recvMsg) {
+        for (Integer neighborIdx : recvMsg.keySet()) {
+            Token token = recvMsg.get(neighborIdx);
             if (token.getTokenType().equals(TokenType.REJECT)) {
                 
             }
@@ -180,7 +183,8 @@ class AsyncThread implements Runnable {
      * 
      */
     private void recvDummy() {
-        for (Token token : recvMsg) {
+        for (Integer neighborIdx : recvMsg.keySet()) {
+            Token token = recvMsg.get(neighborIdx);
             if (token.getTokenType().equals(TokenType.DUMMY)) {
 
             }
