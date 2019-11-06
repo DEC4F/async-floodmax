@@ -98,6 +98,7 @@ class MasterThread implements Runnable {
                     BlockingQueue<Token> jtoi = new ArrayBlockingQueue<>(capacity);
                     threads[i].addNeighbor(threads[j], itoj, jtoi);
                     threads[j].addNeighbor(threads[i], jtoi, itoj);
+                    // System.out.println("Conn added for thread " + Integer.toString(threads[i].getUID()) + " and " + Integer.toString(threads[j].getUID()));
                 }
             }
         }

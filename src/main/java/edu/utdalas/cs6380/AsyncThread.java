@@ -57,6 +57,7 @@ class AsyncThread implements Runnable {
         try {
             // init
             flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
+            System.out.println("Thread!!!" + Integer.toString(UID));
             while (status.equals(Status.UNKNOWN)) {
                 // reset talkedTo for this "round"
                 for (AsyncThread neighbor : sendChannels.keySet()) {
@@ -64,6 +65,7 @@ class AsyncThread implements Runnable {
                 }
                 recv();
                 round ++;
+                System.out.println("Round = " + round);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -89,7 +91,9 @@ class AsyncThread implements Runnable {
             BlockingQueue<Token> chann = recvChannels.get(neighbor);
             while (!chann.isEmpty() && chann.peek().getRoundTag() <= round) {
                 recvMsg.put(neighbor, chann.take());
+                System.out.println("Thread " + Integer.toString(UID) + ": i'm stuck here");
             }
+            System.out.println("Thread " + Integer.toString(UID) + ": wait, im not");
         }
         parseRecvToken();
     }
@@ -185,8 +189,16 @@ class AsyncThread implements Runnable {
                 numReply --;
             }
         }
-        if (numReply == 0)
-            send(new Token(UID, maxUID, TokenType.COMPLETED, round), parent);
+        if (numReply == 0) {
+            // all children have completed, forward to parent
+            if (parent != this)
+                send(new Token(UID, maxUID, TokenType.COMPLETED, round), parent);
+            // leader is found
+            else {
+                flood(new Token(UID, UID, TokenType.ANOUNCEMENT, round));
+                MasterThread.leaderID = UID;
+            }
+        }
     }
 
     /**
