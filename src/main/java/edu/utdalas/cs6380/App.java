@@ -35,12 +35,18 @@ public final class App {
             validateInput(args);
             String inputLoc = args[0];
             readInput(inputLoc);
-            // printAdjacencyMatrix();
-            new Thread(new MasterThread(n, ids, adj)).start();
+            MasterThread master = new MasterThread(n, ids, adj);
+            new Thread(master).start();
+
+            // test hook
+            while (true) {
+                if (master.getFinished())
+                    break;
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
-        // return -1;
     }
 
     //////////////////////////////////

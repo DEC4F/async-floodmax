@@ -3,8 +3,6 @@ package edu.utdalas.cs6380;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-import edu.utdalas.cs6380.ThreadException.ErrorCode;
-
 /**
  * The master threads that controls the leader election
  */
@@ -13,13 +11,15 @@ class MasterThread implements Runnable {
     //////////////////////////////////
     // FIELDS
     //////////////////////////////////
-
+    
+    private final int capacity = 10;
     private int n;
     private int[] ids;
     private int[][] adj;
-    private final int capacity = 10;
     private AsyncThread[] threads;
+    private boolean finished = false;
     static int leaderID = -1;
+
 
     //////////////////////////////////
     // CONSTRUCTOR
@@ -46,6 +46,7 @@ class MasterThread implements Runnable {
             waitForInfo();
             // print required information
             printInfo();
+            finished = true;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -98,15 +99,13 @@ class MasterThread implements Runnable {
                     BlockingQueue<Token> jtoi = new ArrayBlockingQueue<>(capacity);
                     threads[i].addNeighbor(threads[j], itoj, jtoi);
                     threads[j].addNeighbor(threads[i], jtoi, itoj);
-                    // System.out.println("Conn added for thread " + Integer.toString(threads[i].getUID()) + " and " + Integer.toString(threads[j].getUID()));
                 }
             }
         }
     }
 
     /**
-     * 
-     * @throws ThreadException
+     * waits for all threads to finish their work
      */
     private void waitForInfo() {
         while (true) {
@@ -120,18 +119,22 @@ class MasterThread implements Runnable {
     }
 
     /**
-     * print leader ID
-     * @throws ThreadException if leader id is still default
+     * print leader ID and total message transmitted in the election
      */
-    private void printInfo() throws ThreadException {
+    private void printInfo() {
+        assert leaderID != -1;
         // calc total msg sent
         int totalMsg = 0;
         for (AsyncThread t : threads) {
             totalMsg += t.getMsgSent();
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("Master Thread: LeaderID = ").append(leaderID).append(", #Msg sent = ").append(Integer.toString(totalMsg));
+        sb.append("Master Thread: LeaderID = ").append(leaderID).append(". Total number of messages sent = ").append(Integer.toString(totalMsg));
         System.out.println(sb.toString());
+    }
+
+    boolean getFinished() {
+        return finished;
     }
 
 }

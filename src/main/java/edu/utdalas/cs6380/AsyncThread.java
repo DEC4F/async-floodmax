@@ -57,22 +57,28 @@ class AsyncThread implements Runnable {
     @Override
     public void run() {
         try {
-            // init
+            // init stage
             flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
+            // intermediate stage
             while (status.equals(Status.UNKNOWN)) {
-                // reset talkedTo for this "round"
-                for (AsyncThread neighbor : sendChannels.keySet()) {
-                    hasTalkedTo.put(neighbor, false);
-                }
+                resetHasTalkedTo();
                 recv();
                 round ++;
             }
+            // final stage
+            printLeaderInfo();
             finished = true;
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * set up in and out channels between current process and neighbor
+     * @param neighbor is the neighboring proc
+     * @param sendChan put out msg here
+     * @param recvChan recv in msg here
+     */
     void addNeighbor(AsyncThread neighbor, BlockingQueue<Token> sendChan, BlockingQueue<Token> recvChan) {
         sendChannels.put(neighbor, sendChan);
         recvChannels.put(neighbor, recvChan);
@@ -85,8 +91,9 @@ class AsyncThread implements Runnable {
 
     /**
      * receive tokens from channels
+     * @throws InterruptedException
      */
-    private void recv() throws InterruptedException, ThreadException {
+    private void recv() throws InterruptedException {
         recvMsg = new HashMap<>();
         for (AsyncThread neighbor : recvChannels.keySet()) {
             BlockingQueue<Token> chann = recvChannels.get(neighbor);
@@ -100,9 +107,8 @@ class AsyncThread implements Runnable {
     /***
      * read all received msg in this "round"
      * @throws InterruptedException
-     * @throws ThreadException
      */
-    private void parseRecvToken () throws InterruptedException, ThreadException {
+    private void parseRecvToken () throws InterruptedException {
         if (recvAnouncement()) {return;}
         recvExplore();
         recvReject();
@@ -111,8 +117,7 @@ class AsyncThread implements Runnable {
     }
 
     /**
-     * update status and leaderID, flood neighbors, print leader ID
-     * @param leaderID
+     * update status and leaderID, flood neighbors
      * @throws InterruptedException
      */
     private Boolean recvAnouncement() throws InterruptedException {
@@ -123,10 +128,6 @@ class AsyncThread implements Runnable {
                 maxUID = token.getMaxID();
                 status = Status.NONLEADER;
                 flood(new Token(UID, maxUID, TokenType.ANOUNCEMENT, round));
-                // print leader info
-                StringBuilder sb = new StringBuilder();
-                sb.append("Thread ").append(UID).append(": LeaderID = ").append(maxUID).append(". Message sent = ").append(msgSent);
-                System.out.println(sb.toString());
                 return true;
             }
         }
@@ -137,9 +138,8 @@ class AsyncThread implements Runnable {
      * update maxUID, flood neighbors if token has greater maxUID
      * reply reject if token is smaller
      * @throws InterruptedException
-     * @throws ThreadException
      */
-    private void recvExplore() throws InterruptedException, ThreadException {
+    private void recvExplore() throws InterruptedException {
         Boolean hasNewInfo = false;
         for (AsyncThread neighbor : recvMsg.keySet()) {
             Token token = recvMsg.get(neighbor);
@@ -163,7 +163,8 @@ class AsyncThread implements Runnable {
     }
 
     /**
-     * 
+     * calculate number of rejected neighbors and send completed token to parent
+     * if all neighbors are either rejected or completed
      * @throws InterruptedException
      */
     private void recvReject() throws InterruptedException {
@@ -173,12 +174,15 @@ class AsyncThread implements Runnable {
                 numReply --;
             }
         }
-        if (numReply == 0 && parent != this)
+        if (numReply == 0 && parent != this) {
             send(new Token(UID, maxUID, TokenType.COMPLETED, round), parent);
+        }
     }
 
     /**
-     * 
+     * calculate number of completed token received
+     * if all children have completed, then send completed token to parent
+     * if parent is this proc itself, then this is the leader, send anouncement token
      * @throws InterruptedException
      */
     private void recvCompleted() throws InterruptedException {
@@ -194,6 +198,7 @@ class AsyncThread implements Runnable {
                 send(new Token(UID, maxUID, TokenType.COMPLETED, round), parent);
             // leader is found
             else {
+                status = Status.LEADER;
                 flood(new Token(UID, UID, TokenType.ANOUNCEMENT, round));
                 MasterThread.leaderID = UID;
             }
@@ -201,8 +206,7 @@ class AsyncThread implements Runnable {
     }
 
     /**
-     * 
-     * @throws InterruptedException
+     * send dummy token to neighbor(s) if this proc hasn't talked to it in this round
      */
     private void sendDummy() throws InterruptedException {
         for (AsyncThread neighbor : hasTalkedTo.keySet()) {
@@ -228,8 +232,9 @@ class AsyncThread implements Runnable {
     }
 
     /**
-     * send reject to smaller token sender
-     * @param senderID
+     * send a token to a neighbor
+     * @param token the token to be sent
+     * @param neighbor the recipient of the token
      * @throws InterruptedException
      */
     private void send(Token token, AsyncThread neighbor) throws InterruptedException {
@@ -242,10 +247,30 @@ class AsyncThread implements Runnable {
 
     /**
      * calculates message transmission delay
-     * @return
+     * @return a random delay between 1 to 10 ms
      */
     private int delay() {;
         return new Random().nextInt(10)+1;
+    }
+
+    /**
+     * resets hasTalkedTo so that neighbors that 
+     * this process hasn't send message to in this round can be flagged
+     */
+    private void resetHasTalkedTo() {
+        for (AsyncThread neighbor : sendChannels.keySet()) {
+            hasTalkedTo.put(neighbor, false);
+        }
+    }
+
+    /**
+     * prints leader information and message sent to stdout
+     */
+    private void printLeaderInfo() {
+        // print leader info
+        StringBuilder sb = new StringBuilder();
+        sb.append("Thread ").append(UID).append(": LeaderID = ").append(maxUID).append(". Message sent = ").append(msgSent);
+        System.out.println(sb.toString());
     }
 
     //////////////////////////////////
