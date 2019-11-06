@@ -1,6 +1,8 @@
 package edu.utdalas.cs6380;
 
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.Random;
@@ -10,9 +12,17 @@ import edu.utdalas.cs6380.Token.TokenType;
 
 class AsyncThread implements Runnable {
 
+    //////////////////////////////////
+    // ENUM
+    //////////////////////////////////
+
     enum Status {
         UNKNOWN, LEADER, NONLEADER
     }
+
+    //////////////////////////////////
+    // FIELDS
+    //////////////////////////////////
 
     private int UID;
     private int maxUID;
@@ -22,23 +32,33 @@ class AsyncThread implements Runnable {
     private int msgSent;
     private Map<Integer, BlockingQueue<Token>> sendChannels;
     private Map<Integer, BlockingQueue<Token>> recvChannels;
+    private List<Token> recvMsg;
+
+    //////////////////////////////////
+    // CONSTRUCTOR
+    //////////////////////////////////
 
     AsyncThread(int ID) {
-        this.UID = ID;
-        this.maxUID = ID;
-        this.status = Status.UNKNOWN;
-        this.round = 1;
-        this.msgSent = 1;
-        this.sendChannels = new HashMap<>();
-        this.recvChannels = new HashMap<>();
+        UID = ID;
+        maxUID = ID;
+        status = Status.UNKNOWN;
+        round = 1;
+        msgSent = 1;
+        sendChannels = new HashMap<>();
+        recvChannels = new HashMap<>();
+        recvMsg = new ArrayList<>();
     }
+
+    //////////////////////////////////
+    // INTERFACE
+    //////////////////////////////////
 
     @Override
     public void run() {
         try {
         while (status.equals(Status.UNKNOWN)) {
             if (round == 1)
-                sendExplore();
+                flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
             recv();
             round ++;
         }
@@ -52,17 +72,36 @@ class AsyncThread implements Runnable {
         recvChannels.put(neighborUID, recvChan);
     }
     
-    private void recv() throws InterruptedException, ThreadException {
-        // set expected number of msg to be recv
-        int numNeighbors = recvChannels.size();
+    //////////////////////////////////
+    // HELPERS
+    //////////////////////////////////
 
+    /**
+     * receive tokens from channels
+     */
+    private void recv() throws InterruptedException, ThreadException {
         for (Integer neighbor : recvChannels.keySet()) {
-            if (recvChannels.isEmpty())
-                continue;
-            Token token = recvChannels.get(neighbor).take();
-            if (token.getTokenType().equals(TokenType.ANOUNCEMENT)) {
+            BlockingQueue<Token> chann = recvChannels.get(neighbor);
+            while (!chann.isEmpty() && chann.peek().getRoundTag() <= round) {
+                recvMsg.add(chann.take());
+            }
+        }
+        parseRecvToken();
+    }
+
+    /***
+     * read all received msg in this "round"
+     * @throws InterruptedException
+     * @throws ThreadException
+     */
+    private void parseRecvToken () throws InterruptedException, ThreadException {
+        for (Token token : recvMsg) {
+            if (token.getTokenType().equals(TokenType.ANOUNCEMENT) && status.equals(Status.UNKNOWN)) {
                 recvAnouncement(token.getMaxID());
                 break;
+            }
+            else if (token.getTokenType().equals(TokenType.EXPLORE)) {
+                recvExplore(token);
             }
             else if (token.getTokenType().equals(TokenType.DUMMY)) {
                 continue;
@@ -70,83 +109,132 @@ class AsyncThread implements Runnable {
             else if (token.getTokenType().equals(TokenType.COMPLETED)) {
                 recvComplete(token.getSenderID());
             }
-            else if (token.getTokenType().equals(TokenType.EXPLORE)) {
-                recvExplore(token);
-            }
             else {
                 recvReject(token.getSenderID());
             }
         }
     }
 
-    private void recvAnouncement(int leaderID) {
-        assert maxUID <= leaderID;
+    /**
+     * update status and leaderID, flood neighbors, print leader ID
+     * @param leaderID
+     * @throws InterruptedException
+     */
+    private void recvAnouncement(Integer leaderID) throws InterruptedException {
+        // validation
+        assert maxUID < leaderID;
+        // flood anouncement token
         maxUID = leaderID;
         status = Status.NONLEADER;
+        flood(new Token(UID, maxUID, TokenType.ANOUNCEMENT, round));
+        // print leader info
         StringBuilder sb = new StringBuilder();
         sb.append("Thread ").append(UID).append(": LeaderID = ").append(maxUID).append(". Message sent = ").append(msgSent);
         System.out.println(sb.toString());
     }
 
+    /**
+     * update maxUID, flood neighbors if token has greater
+     * reply reject if token is smaller
+     * @param token
+     * @throws InterruptedException
+     * @throws ThreadException
+     */
     private void recvExplore(Token token) throws InterruptedException, ThreadException {
+        // flood explore token
         if (token.getMaxID() > UID) {
-            UID = token.getMaxID();
+            maxUID = token.getMaxID();
             parentUID = token.getSenderID();
-            sendExplore();
+            flood(new Token(UID, maxUID, TokenType.EXPLORE, round));
         }
+        // reply(NACK)
         else if (token.getMaxID() < UID) {
             sendReject(token.getSenderID());
         }
+        // impossible to receive own UID from neighbor
         else
             throw new ThreadException(ErrorCode.RECEIVING_OWN_UID_FROM_NEIGHBOR);
     }
 
+    /**
+     * 
+     * @param senderID
+     */
     private void recvComplete(int senderID) {
 
     }
 
+    /**
+     * 
+     * @param senderID
+     */
     private void recvReject(int senderID) {
 
     }
 
-    private void sendAnouncement() {
-
-    }
-
-    private void sendExplore() throws InterruptedException {
+    /**
+     * flood non-parent neighbors with input token, increment message sent
+     * @param token
+     * @throws InterruptedException
+     */
+    private void flood (Token token) throws InterruptedException {
         for (Integer neighbor: sendChannels.keySet()) {
             if (!neighbor.equals(parentUID)) {
                 Thread.sleep(delay());
-                Token exploreToken = new Token(UID, maxUID, TokenType.EXPLORE, round);
-                sendChannels.get(neighbor).put(exploreToken);
+                sendChannels.get(neighbor).put(token);
                 msgSent ++;
             }
         }
     }
 
+    /**
+     * send reject to smaller token sender
+     * @param senderID
+     * @throws InterruptedException
+     */
     private void sendReject (int senderID) throws InterruptedException {
-        Thread.sleep(delay());
         Token rejectToken = new Token(UID, maxUID, TokenType.REJECT, round);
+        Thread.sleep(delay());
         sendChannels.get(senderID).put(rejectToken);
         msgSent ++;
     }
 
+    /**
+     * send complete to parent
+     */
     private void sendComplete () {
 
     }
 
+    /**
+     * send dummy msg if no msg send to that neighbor at this round
+     * @param neighborUID
+     * @throws InterruptedException
+     */
     private void sendDummy (int neighborUID) throws InterruptedException {
-        Thread.sleep(delay());
         Token dummyToken = new Token(UID, maxUID, TokenType.DUMMY, round);
+        Thread.sleep(delay());
         sendChannels.get(neighborUID).put(dummyToken);
     }
 
+    /**
+     * calculates message transmission delay
+     * @return
+     */
     private int delay() {;
         return new Random().nextInt(10)+1;
     }
 
+    //////////////////////////////////
+    // ACCESSORS
+    //////////////////////////////////
+
     int getUID () {
         return UID;
+    }
+
+    int getMsgSent() {
+        return msgSent;
     }
 
 }
