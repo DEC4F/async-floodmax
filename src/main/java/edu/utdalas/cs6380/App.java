@@ -38,12 +38,10 @@ public final class App {
             MasterThread master = new MasterThread(n, ids, adj);
             new Thread(master).start();
 
-            // test hook
-            while (true) {
-                if (master.getFinished())
-                    break;
+            // wait for master to finish
+            while (!master.getFinished()) {
+                Thread.sleep(1);
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
