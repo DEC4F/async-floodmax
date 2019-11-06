@@ -144,4 +144,9 @@ class AsyncThread implements Runnable {
     private int delay() {;
         return new Random().nextInt(10)+1;
     }
+
+    int getUID () {
+        return UID;
+    }
+
 }
